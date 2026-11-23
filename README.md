@@ -8,6 +8,34 @@
 - 授权窗口
 - 排片校核
 - 缺口单
+- 发布分发（版本化整版排片的签署、增量批次、幂等回执与核对）
+
+### 发布分发
+
+发布组按「地域 + 媒介」渠道签署整版排片，接收端只收到相对上一版的增量
+（新增 `added`、改期 `rescheduled`、取消 `cancelled`），整版快照仍保留用于核对。
+
+- 批次内容在签署时固化；分批读取期间再签新版，已生成批次保持原样。
+- 同一渠道严格按签署顺序确认：存在更小序号的未确认批次时，后续批次返回
+  409，不能跳过漏收批次；不同渠道互不阻塞。
+- 回执以确定性幂等键（`渠道#v序号`）重试，重复确认不重复生效。
+- 投递连续失败超过上限标记为 `dead`，仍属未确认并继续挡住后续批次，可人工重挂。
+- 发布页「发布分发」并排展示待确认变更与接收端实际生效版本，标注漏收与阻塞。
+
+核心状态机位于 `backend/src/distribution/`（仅依赖标准库），SQLAlchemy 仓储在
+`backend/src/services/distribution_repo.py`，路由前缀 `/api/distribution`。
+
+## 本地测试
+
+```sh
+cd backend
+python3 -m unittest discover -s tests
+```
+
+`test_distribution.py` 为纯标准库领域测试；`test_sqlite3_repo.py` 用内置
+sqlite3 验证真实关系库上的持久化、事务与唯一约束；`test_routes_stub.py`
+用轻量桩件验证路由处理函数与错误码映射。安装项目依赖（见 requirements.txt）
+后，`test_sql_repo_sqlite.py` 会用 SQLAlchemy + sqlite 额外验证生产仓储。
 
 ## 本地运行
 
